@@ -32,11 +32,15 @@ type Client struct {
 	cache atomic.Value
 }
 
+// nodeCache holds both an html.Node and a time.Time. That's about it,
+// actually.
 type nodeCache struct {
 	val *html.Node
 	ts  time.Time
 }
 
+// cached returns the currently cached value. If there is no such
+// value or the value has expired, it returns nil.
 func (c *Client) cached() *html.Node {
 	const maxAge = time.Hour
 
@@ -53,6 +57,9 @@ func (c *Client) cached() *html.Node {
 	return cache.val
 }
 
+// page fetches and parses the main page of Drudge Report. It uses the
+// Client's cache if possible, and caches the newly parsed node if no
+// node is currently cached.
 func (c *Client) page() (*html.Node, error) {
 	if cached := c.cached(); cached != nil {
 		return cached, nil
@@ -73,6 +80,7 @@ func (c *Client) page() (*html.Node, error) {
 	return node, nil
 }
 
+// collect parses all of the Articles out of a node that it can find.
 func (c *Client) collect(node *html.Node) (articles []Article, err error) {
 	images := make(map[string]struct{})
 
@@ -108,6 +116,8 @@ func (c *Client) collect(node *html.Node) (articles []Article, err error) {
 	return articles, nil
 }
 
+// get returns all of the articles in a specific section of the page.
+// These sections are deliniated by tag IDs.
 func (c *Client) get(section string) ([]Article, error) {
 	node, err := c.page()
 	if err != nil {
@@ -122,10 +132,14 @@ func (c *Client) get(section string) ([]Article, error) {
 	return c.collect(node)
 }
 
+// Top returns the articles in the top section of the page. This
+// includes the main headline.
 func (c *Client) Top() (articles []Article, err error) {
 	return c.get("app_topstories")
 }
 
+// Column returns the articles in one of the columns. The function
+// panics if num is not in the range [1, 3].
 func (c *Client) Column(num int) ([]Article, error) {
 	if (num < 1) || (num > 3) {
 		panic(fmt.Errorf("Bad column number: %v", num))
@@ -134,8 +148,15 @@ func (c *Client) Column(num int) ([]Article, error) {
 	return c.get("app_col" + strconv.FormatInt(int64(num), 10))
 }
 
+// Article holds information about an article.
 type Article struct {
+	// Headline is the text used for the link to the article on Drudge
+	// Report. It is likely not the article's actual headline.
 	Headline string
-	URL      *url.URL
-	Image    *url.URL
+
+	// URL is the URL of the article as linked to by Drudge Report.
+	URL *url.URL
+
+	// Image is the image associated with the article, if there is one.
+	Image *url.URL
 }
