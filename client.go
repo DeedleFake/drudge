@@ -19,7 +19,14 @@ const (
 	URL = "http://www.drudgereport.com"
 )
 
+// Client is used for getting data from Drudge Report. It is safe for
+// concurrent use. The zero value of client is ready to use.
+//
+// A Client caches the parsed HTML data that is fetched from Drudge
+// Report. This cache is refreshed if at least an hour has passed
+// since the last update to the cache.
 type Client struct {
+	// Client is the http.Client to use for fetching data.
 	Client http.Client
 
 	cache atomic.Value
