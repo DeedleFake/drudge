@@ -2,8 +2,12 @@ package drudge
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
+	"sync/atomic"
+	"time"
 
 	"github.com/yhat/scrape"
 
@@ -17,16 +21,49 @@ const (
 
 type Client struct {
 	Client http.Client
+
+	cache atomic.Value
+}
+
+type nodeCache struct {
+	val *html.Node
+	ts  time.Time
+}
+
+func (c *Client) cached() *html.Node {
+	const maxAge = time.Hour
+
+	cache, ok := c.cache.Load().(nodeCache)
+	if !ok || (cache.val == nil) {
+		return nil
+	}
+
+	if time.Since(cache.ts) > maxAge {
+		c.cache.Store(nodeCache{})
+		return nil
+	}
+
+	return cache.val
 }
 
 func (c *Client) page() (*html.Node, error) {
+	if cached := c.cached(); cached != nil {
+		return cached, nil
+	}
+
 	rsp, err := c.Client.Get(URL)
 	if err != nil {
 		return nil, err
 	}
 	defer rsp.Body.Close()
 
-	return html.Parse(rsp.Body)
+	node, err := html.Parse(rsp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	c.cache.Store(nodeCache{val: node, ts: time.Now()})
+	return node, nil
 }
 
 func (c *Client) collect(node *html.Node) (articles []Article, err error) {
@@ -64,18 +101,30 @@ func (c *Client) collect(node *html.Node) (articles []Article, err error) {
 	return articles, nil
 }
 
-func (c *Client) Top() (articles []Article, err error) {
+func (c *Client) get(section string) ([]Article, error) {
 	node, err := c.page()
 	if err != nil {
 		return nil, err
 	}
 
-	node, ok := scrape.Find(node, scrape.ById("app_topstories"))
+	node, ok := scrape.Find(node, scrape.ById(section))
 	if !ok {
 		return nil, errors.New("Couldn't find the top stories.")
 	}
 
 	return c.collect(node)
+}
+
+func (c *Client) Top() (articles []Article, err error) {
+	return c.get("app_topstories")
+}
+
+func (c *Client) Column(num int) ([]Article, error) {
+	if (num < 1) || (num > 3) {
+		panic(fmt.Errorf("Bad column number: %v", num))
+	}
+
+	return c.get("app_col" + strconv.FormatInt(int64(num), 10))
 }
 
 type Article struct {
