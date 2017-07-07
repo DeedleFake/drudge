@@ -19,8 +19,8 @@ func TestClient(t *testing.T) {
 		t.Logf("%#v", article)
 	}
 
-	for i := 1; i < 3; i++ {
-		col, err := c.Column(i)
+	for i := 1; i <= 3; i++ {
+		col, err := c.Column(drudge.Column(i))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,11 +1,10 @@
 package drudge
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -84,7 +83,9 @@ func (c *Client) page() (*html.Node, error) {
 func (c *Client) collect(node *html.Node) (articles []Article, err error) {
 	images := make(map[string]struct{})
 
-	links := scrape.FindAll(node, scrape.ByTag(atom.A))
+	links := scrape.FindAll(node, until(scrape.ByTag(atom.A), func(node *html.Node) bool {
+		return (node.Type == html.CommentNode) && strings.Contains(node.Data, "END")
+	}))
 	for _, link := range links {
 		href, err := url.Parse(scrape.Attr(link, "href"))
 		if err != nil {
@@ -117,16 +118,15 @@ func (c *Client) collect(node *html.Node) (articles []Article, err error) {
 }
 
 // get returns all of the articles in a specific section of the page.
-// These sections are deliniated by tag IDs.
-func (c *Client) get(section string) ([]Article, error) {
+func (c *Client) get(m scrape.Matcher) ([]Article, error) {
 	node, err := c.page()
 	if err != nil {
 		return nil, err
 	}
 
-	node, ok := scrape.Find(node, scrape.ById(section))
+	node, ok := scrape.Find(node, m)
 	if !ok {
-		return nil, errors.New("Couldn't find the top stories.")
+		return nil, fmt.Errorf("Couldn't find requested section.")
 	}
 
 	return c.collect(node)
@@ -135,17 +135,28 @@ func (c *Client) get(section string) ([]Article, error) {
 // Top returns the articles in the top section of the page. This
 // includes the main headline.
 func (c *Client) Top() (articles []Article, err error) {
-	return c.get("app_topstories")
+	return c.get(scrape.ById("app_topstories"))
 }
 
 // Column returns the articles in one of the columns. The function
 // panics if num is not in the range [1, 3].
-func (c *Client) Column(num int) ([]Article, error) {
-	if (num < 1) || (num > 3) {
-		panic(fmt.Errorf("Bad column number: %v", num))
-	}
+func (c *Client) Column(num Column) ([]Article, error) {
+	return c.get(num.section())
+}
 
-	return c.get("app_col" + strconv.FormatInt(int64(num), 10))
+func until(m scrape.Matcher, stop scrape.Matcher) scrape.Matcher {
+	var done bool
+	return func(node *html.Node) bool {
+		if done {
+			return false
+		}
+		if stop(node) {
+			done = true
+			return false
+		}
+
+		return m(node)
+	}
 }
 
 // Article holds information about an article.
@@ -159,4 +170,29 @@ type Article struct {
 
 	// Image is the image associated with the article, if there is one.
 	Image *url.URL
+}
+
+type Column int
+
+const (
+	First Column = 1 + iota
+	Second
+	Third
+)
+
+func (c Column) section() scrape.Matcher {
+	num := int((c-1)*2 + 1)
+
+	return func(node *html.Node) bool {
+		if node.DataAtom != atom.Td {
+			return false
+		}
+
+		num--
+		if num == 0 {
+			return true
+		}
+
+		return false
+	}
 }
