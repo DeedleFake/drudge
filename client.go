@@ -138,8 +138,7 @@ func (c *Client) Top() (articles []Article, err error) {
 	return c.get(scrape.ById("app_topstories"))
 }
 
-// Column returns the articles in one of the columns. The function
-// panics if num is not in the range [1, 3].
+// Column returns the articles in one of the columns.
 func (c *Client) Column(num Column) ([]Article, error) {
 	return c.get(num.section())
 }
