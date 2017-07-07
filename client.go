@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	// URL is the URL from which all information is fetched.
 	URL = "http://www.drudgereport.com"
 )
 
@@ -126,7 +127,7 @@ func (c *Client) get(m scrape.Matcher) ([]Article, error) {
 
 	node, ok := scrape.Find(node, m)
 	if !ok {
-		return nil, fmt.Errorf("Couldn't find requested section.")
+		return nil, fmt.Errorf("Couldn't find requested section")
 	}
 
 	return c.collect(node)
@@ -171,13 +172,9 @@ type Article struct {
 	Image *url.URL
 }
 
+// A Column cooresponds to one of the columns of the site, numbered
+// from the left.
 type Column int
-
-const (
-	First Column = 1 + iota
-	Second
-	Third
-)
 
 func (c Column) section() scrape.Matcher {
 	num := int((c-1)*2 + 1)
@@ -188,10 +185,6 @@ func (c Column) section() scrape.Matcher {
 		}
 
 		num--
-		if num == 0 {
-			return true
-		}
-
-		return false
+		return num == 0
 	}
 }
