@@ -44,11 +44,13 @@ func init() {
 	}
 }
 
+// Section represents a section of the site.
 type Section struct {
 	Title string
 	Fetch func() ([]drudge.Article, error)
 }
 
+// Print prints the section to w.
 func (s Section) Print(w io.Writer) error {
 	articles, err := s.Fetch()
 	if err != nil {
@@ -67,6 +69,7 @@ func (s Section) Print(w io.Writer) error {
 	return ew.err
 }
 
+// A CSFlag is a comma-separated string list.
 type CSFlag []string
 
 func (c CSFlag) String() string {
