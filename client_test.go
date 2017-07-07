@@ -7,6 +7,8 @@ import (
 )
 
 func TestClient(t *testing.T) {
+	// TODO: Better tests. The bane of small projects...
+
 	var c drudge.Client
 
 	top, err := c.Top()
