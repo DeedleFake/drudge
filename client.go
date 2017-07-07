@@ -85,7 +85,7 @@ func (c *Client) collect(node *html.Node) (articles []Article, err error) {
 	images := make(map[string]struct{})
 
 	links := scrape.FindAll(node, until(scrape.ByTag(atom.A), func(node *html.Node) bool {
-		return (node.Type == html.CommentNode) && strings.Contains(node.Data, "END")
+		return (node.Type == html.CommentNode) && strings.Contains(node.Data, "L I N K S")
 	}))
 	for _, link := range links {
 		href, err := url.Parse(scrape.Attr(link, "href"))
